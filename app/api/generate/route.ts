@@ -2,117 +2,179 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const systemPrompt = `
-You are an advanced image editor.
+// ---------------------- PROMPT ------------------------
 
-Your output MUST be exactly ONE image.
-Return it ONLY as inlineData (image/png).
-Do NOT return text. Do NOT speak. ONLY return an edited image.
+const PROMPT = `
+Create a vertical 9:16 cinematic composite of the user (identity must remain EXACT as in the uploaded face image). 
+The final portrait must be divided into **three vertically stacked frames**:
 
-TASK:
-- Take the user face photo (first image)
-- Preserve identity and face shape 100%
-- Apply Korean winter skincare aesthetic
-- Soft cold light, light snowfall
-- Subtle frost reflections inspired by IceBall (second image)
-- Photorealistic, cinematic HDR
-- Vertical 9:16 portrait
+TOP FRAME:
+- Extreme close-up of the user's eye and cheek  
+- Small snowflakes resting on eyelashes  
+- Soft overcast daylight creating natural winter glow  
+
+MIDDLE FRAME:
+- 3/4 profile of the user  
+- User is gently using the Ice Ball skincare applicator on their cheek  
+- The Ice Ball must be **small and realistic**, human-scale, about the size of a golf ball  
+- White handle + frosted pink translucent sphere  
+- Subtle snowlight reflection  
+- No distortion, no oversized effect, no magical glow  
+- Should look like a natural skincare product in real use  
+
+BOTTOM FRAME:
+- Chest-up portrait of the user facing the camera  
+- User holding the Ice Ball close to the face  
+- Calm, emotional winter mood  
+- Gentle falling snow, shallow depth of field  
+
+LIGHTING & STYLE:
+- Soft overcast daylight  
+- Cinematic HDR tone  
+- Shallow depth (Canon EOS R5, 85mm f/1.2 aesthetic)  
+- Photorealistic  
+- Fine skin texture  
+- Visible snow particles  
+- Korean winter skincare campaign aesthetic  
+
+OUTFIT:
+- Black wool coat  
+- Thick white scarf  
+- Hair neatly tucked  
+- No hat  
+
+ENVIRONMENT:
+- Snowy background with soft focus  
+- Luxurious and emotional winter mood  
+
+PRODUCT RULES:
+- Use the Ice Ball reference image ONLY for accurate shape, material, and reflection  
+- Product must appear premium and elegantly integrated  
+- Absolutely DO NOT enlarge, distort, warp, or glow the Ice Ball  
 `;
+
+// -------------------- MAIN ROUTE ----------------------
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
-    const userFile = formData.get("image");
+    console.log("🔵 /api/generate called");
+
+    const form = await req.formData();
+    const userFile = form.get("image");
 
     if (!(userFile instanceof File)) {
-      return NextResponse.json({ error: "No image provided" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No user image file" },
+        { status: 400 }
+      );
     }
+
+    // ---------------- ENV CHECK ----------------
 
     const apiKey = process.env.GEMINI_API_KEY;
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
-    if (!apiKey) {
-      console.error("GEMINI_API_KEY missing in environment");
-      return NextResponse.json(
-        { error: "Missing GEMINI_API_KEY" },
-        { status: 500 }
-      );
-    }
-
-    console.log("GEMINI_API_KEY length:", apiKey.length);
-    console.log("GEMINI_API_KEY prefix:", apiKey.slice(0, 6));
-
     if (!apiKey || !baseUrl) {
+      console.error("❌ Missing env vars");
       return NextResponse.json(
-        { error: "Missing environment variables" },
+        { error: "Missing GEMINI_API_KEY or NEXT_PUBLIC_BASE_URL" },
         { status: 500 }
       );
     }
+
+    console.log("🔑 API key OK, length:", apiKey.length);
+
+    // ---------------- USER IMAGE ----------------
 
     const userMime = userFile.type || "image/png";
     const userBase64 = Buffer.from(await userFile.arrayBuffer()).toString("base64");
 
-    const refUrl = `${baseUrl}/iceball_ref.PNG`;
-    const refRes = await fetch(refUrl);
+    // ---------------- ICEBALL REF ----------------
 
+    const refURL = `${baseUrl}/iceball_ref.PNG`;
+    console.log("🧊 Loading IceBall ref:", refURL);
+
+    const refRes = await fetch(refURL);
     if (!refRes.ok) {
       return NextResponse.json(
-        { error: "Failed to load IceBall reference image" },
+        { error: "Cannot load IceBall reference file" },
         { status: 500 }
       );
     }
 
     const refBase64 = Buffer.from(await refRes.arrayBuffer()).toString("base64");
 
-    const gRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [
-                { text: systemPrompt },
-                { inlineData: { mimeType: userMime, data: userBase64 } },
-                { inlineData: { mimeType: "image/png", data: refBase64 } },
-              ],
-            },
-          ],
-        }),
-      }
-    );
+    // ---------------- GEMINI REQUEST ----------------
 
-    const raw = await gRes.json();
+    const endpoint =
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent" +
+      `?key=${apiKey}`;
 
-    console.log("Gemini RAW:", JSON.stringify(raw, null, 2));
+    const payload = {
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: PROMPT },
+            { inlineData: { mimeType: userMime, data: userBase64 } },
+            { inlineData: { mimeType: "image/png", data: refBase64 } }
+          ]
+        }
+      ]
+    };
 
-    const base64Out =
-      raw?.candidates?.[0]?.content?.parts?.find(
-        (p: any) => p.inlineData?.data
-      )?.inlineData?.data;
+    console.log("📡 Sending to Gemini…");
 
-    if (!base64Out) {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const raw = await response.text();
+    console.log("📥 Gemini RAW:", raw.slice(0, 300));
+
+    if (!response.ok) {
       return NextResponse.json(
-        { error: "Gemini returned no image", raw },
+        { error: "Gemini error", details: raw },
         { status: 500 }
       );
     }
 
-    const buffer = Buffer.from(base64Out, "base64");
+    const json = JSON.parse(raw);
 
-    return new NextResponse(buffer, {
+    // ------------- Extract Base64 Output -------------
+
+    let base64Out = null;
+
+    for (const cand of json.candidates || []) {
+      for (const part of cand.content?.parts || []) {
+        if (part.inlineData?.data) base64Out = part.inlineData.data;
+      }
+    }
+
+    if (!base64Out) {
+      return NextResponse.json(
+        { error: "No image returned by Gemini" },
+        { status: 500 }
+      );
+    }
+
+    const outputBuffer = Buffer.from(base64Out, "base64");
+
+    return new NextResponse(outputBuffer, {
       status: 200,
       headers: {
         "Content-Type": "image/png",
-        "Cache-Control": "no-store",
-      },
+        "Cache-Control": "no-store"
+      }
     });
   } catch (err: any) {
-    console.error("❌ /api/generate error:", err);
+    console.error("🔥 API ERROR:", err);
     return NextResponse.json(
-      { error: "Server crash", details: String(err?.message || err) },
+      { error: "Server crashed", details: String(err) },
       { status: 500 }
     );
   }
