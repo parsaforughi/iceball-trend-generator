@@ -517,12 +517,17 @@ export default function Page() {
           <div className="ice-crack-border" />
           <div id="iceFX-root" className="pointer-events-none absolute inset-0" />
 
-          <header className="text-center space-y-2 mb-6 relative z-10">
+          <header className="text-center space-y-3 mb-6 relative z-10 flex flex-col items-center">
+            <img
+              src="/iceball_logo.png"
+              alt="IceBall Logo"
+              style={{ width: "82px", height: "82px", marginBottom: "8px" }}
+            />
             <h1 className="text-3xl font-bold tracking-tight" style={{ letterSpacing: "-0.04em" }}>
               آماده‌ای یخ بزنی؟
             </h1>
             <p className="text-sm text-gray-700" style={{ fontWeight: 300 }}>
-              عکست رو بده؛ من سردترین نسخه‌ت رو می‌سازم ❄
+              عکست رو بده؛ من سردترین حالتت رو می‌سازم ❄
             </p>
           </header>
 
@@ -581,6 +586,31 @@ export default function Page() {
                     display: "block",
                   }}
                 />
+              </div>
+            )}
+            {output && (
+              <div className="mt-4 flex justify-center">
+                <a
+                  href={output}
+                  download="iceball-winter-portrait.png"
+                  className="px-5 py-3 rounded-xl text-white font-semibold"
+                  style={{
+                    background: "linear-gradient(135deg, #1e90ff, #0a3d62)",
+                    boxShadow: "0 10px 30px rgba(40,120,255,0.45)",
+                    border: "1px solid rgba(255,255,255,0.6)",
+                    transition: "transform 0.25s ease, box-shadow 0.25s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-3px)";
+                    e.currentTarget.style.boxShadow = "0 14px 40px rgba(60,150,255,0.7)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0px)";
+                    e.currentTarget.style.boxShadow = "0 10px 30px rgba(40,120,255,0.45)";
+                  }}
+                >
+                  دانلود تصویر ❄
+                </a>
               </div>
             )}
 
