@@ -197,7 +197,7 @@ export default function Page() {
           animation-name: snowFall, snowSway;
           animation-iteration-count: infinite;
           animation-timing-function: linear;
-          z-index: -1;
+          z-index: 5;
         }
 
         @keyframes snowFall {
@@ -399,7 +399,7 @@ export default function Page() {
       <main
         dir="rtl"
         className="min-h-screen w-full flex justify-center px-4 py-10"
-        style={{ alignItems: "flex-start" }}
+        style={{ alignItems: "center" }}
       >
         <div
           className="relative w-full max-w-md frost-glass card-float"
