@@ -142,6 +142,7 @@ export default function Page() {
     let frameId: number;
 
     function render() {
+      if (!ctx) return;
       ctx.clearRect(0, 0, width, height);
 
       for (const f of flakes) {
