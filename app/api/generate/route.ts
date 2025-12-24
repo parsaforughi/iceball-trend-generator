@@ -56,8 +56,19 @@ PRODUCT RULES:
 // -------------------- MAIN ROUTE ----------------------
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+  const generationId = `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
   try {
     console.log("🔵 /api/generate called");
+
+    // Add generation to tracking
+    try {
+      const { addGeneration } = await import("../generations/route");
+      addGeneration(generationId, "processing");
+    } catch (e) {
+      console.warn("Failed to track generation:", e);
+    }
 
     const form = await req.formData();
     const userFile = form.get("image");
