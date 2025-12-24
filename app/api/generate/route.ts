@@ -164,6 +164,19 @@ export async function POST(req: NextRequest) {
 
     const outputBuffer = Buffer.from(base64Out, "base64");
 
+    // Update stats and generation tracking
+    const processingTime = (Date.now() - startTime) / 1000; // in seconds
+    try {
+      const { updateStats } = await import("../stats/route");
+      updateStats(true, processingTime);
+      
+      const { updateGeneration } = await import("../generations/route");
+      updateGeneration(generationId, "completed", processingTime);
+    } catch (e) {
+      // Stats update failed, but generation succeeded
+      console.warn("Failed to update stats:", e);
+    }
+
     return new NextResponse(outputBuffer, {
       status: 200,
       headers: {
@@ -173,6 +186,19 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("🔥 API ERROR:", err);
+    
+    // Update stats for failure
+    const processingTime = (Date.now() - startTime) / 1000;
+    try {
+      const { updateStats } = await import("../stats/route");
+      updateStats(false, processingTime);
+      
+      const { updateGeneration } = await import("../generations/route");
+      updateGeneration(generationId, "failed", processingTime, String(err));
+    } catch (e) {
+      // Stats update failed
+    }
+    
     return NextResponse.json(
       { error: "Server crashed", details: String(err) },
       { status: 500 }
