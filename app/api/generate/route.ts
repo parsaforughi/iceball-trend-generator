@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
 
     // Add generation to tracking
     try {
-      const { addGeneration } = await import("../generations/route");
+      const { addGeneration } = await import("@/lib/generations");
       addGeneration(generationId, "processing");
     } catch (e) {
       console.warn("Failed to track generation:", e);
@@ -178,10 +178,10 @@ export async function POST(req: NextRequest) {
     // Update stats and generation tracking
     const processingTime = (Date.now() - startTime) / 1000; // in seconds
     try {
-      const { updateStats } = await import("../stats/route");
+      const { updateStats } = await import("@/lib/stats");
       updateStats(true, processingTime);
       
-      const { updateGeneration } = await import("../generations/route");
+      const { updateGeneration } = await import("@/lib/generations");
       updateGeneration(generationId, "completed", processingTime);
     } catch (e) {
       // Stats update failed, but generation succeeded
