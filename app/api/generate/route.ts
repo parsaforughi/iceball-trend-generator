@@ -199,7 +199,7 @@ export async function POST(req: NextRequest) {
     console.error("🔥 API ERROR:", err);
     
     // Update stats for failure
-    const processingTime = (Date.now() - startTime) / 1000;
+    const processingTime = startTime ? (Date.now() - startTime) / 1000 : 0;
     try {
       const { updateStats } = await import("../stats/route");
       updateStats(false, processingTime);
