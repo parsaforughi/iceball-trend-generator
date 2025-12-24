@@ -201,10 +201,10 @@ export async function POST(req: NextRequest) {
     // Update stats for failure
     const processingTime = startTime ? (Date.now() - startTime) / 1000 : 0;
     try {
-      const { updateStats } = await import("../stats/route");
+      const { updateStats } = await import("@/lib/stats");
       updateStats(false, processingTime);
       
-      const { updateGeneration } = await import("../generations/route");
+      const { updateGeneration } = await import("@/lib/generations");
       updateGeneration(generationId, "failed", processingTime, String(err));
     } catch (e) {
       // Stats update failed
