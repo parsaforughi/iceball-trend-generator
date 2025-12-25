@@ -60,7 +60,16 @@ function resetDailyIfNeeded(stats: StatsData) {
   }
 }
 
-export function getStats(): StatsData {
+export interface StatsResponse {
+  totalGenerations: number;
+  successfulGenerations: number;
+  failedGenerations: number;
+  averageProcessingTime: number;
+  todayGenerations: number;
+  last24Hours: number;
+}
+
+export function getStats(): StatsResponse {
   const stats = loadStats();
   
   // Reset daily counts if needed
