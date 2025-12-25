@@ -82,15 +82,39 @@ function loadStats(): StatsData {
 
 function saveStats(stats: StatsData) {
   try {
+    console.log("💾 Attempting to save stats to:", STATS_FILE);
+    console.log("💾 Data directory:", DATA_DIR);
+    
     // Ensure data directory exists
     const { mkdirSync } = require("fs");
     mkdirSync(DATA_DIR, { recursive: true });
     
-    writeFileSync(STATS_FILE, JSON.stringify(stats, null, 2), "utf-8");
-    console.log("✅ Stats saved:", { total: stats.totalGenerations, success: stats.successfulGenerations });
+    const statsJson = JSON.stringify(stats, null, 2);
+    writeFileSync(STATS_FILE, statsJson, "utf-8");
+    
+    console.log("✅ Stats saved successfully:", { 
+      total: stats.totalGenerations, 
+      success: stats.successfulGenerations,
+      failed: stats.failedGenerations,
+      fileSize: statsJson.length 
+    });
+    
+    // Verify file was written
+    const { existsSync, statSync } = require("fs");
+    if (existsSync(STATS_FILE)) {
+      const fileStats = statSync(STATS_FILE);
+      console.log("✅ File exists, size:", fileStats.size, "bytes");
+    } else {
+      console.error("❌ File was not created!");
+    }
+    
   } catch (e: any) {
     console.error("❌ Failed to save stats to file:", e.message);
-    console.error("Path:", STATS_FILE, "Data dir:", DATA_DIR);
+    console.error("❌ Error stack:", e.stack);
+    console.error("❌ Path:", STATS_FILE);
+    console.error("❌ Data dir:", DATA_DIR);
+    console.error("❌ Current working directory:", process.cwd());
+    throw e; // Re-throw to let caller know save failed
   }
 }
 
@@ -114,7 +138,14 @@ export interface StatsResponse {
 }
 
 export function getStats(): StatsResponse {
+  console.log("📊 getStats called, loading from:", STATS_FILE);
   const stats = loadStats();
+  
+  console.log("📥 Loaded stats:", { 
+    total: stats.totalGenerations, 
+    success: stats.successfulGenerations,
+    failed: stats.failedGenerations 
+  });
   
   // Reset daily counts if needed
   resetDailyIfNeeded(stats);
@@ -123,6 +154,20 @@ export function getStats(): StatsResponse {
   if (stats.processingTimes.length > 0) {
     stats.averageProcessingTime = 
       stats.processingTimes.reduce((a, b) => a + b, 0) / stats.processingTimes.length;
+  }
+
+  // Ensure consistency
+  if (stats.successfulGenerations > stats.totalGenerations) {
+    console.warn("⚠️ Inconsistent stats detected, fixing...");
+    stats.successfulGenerations = stats.totalGenerations;
+    stats.failedGenerations = 0;
+    saveStats(stats);
+  }
+  
+  if (stats.failedGenerations !== stats.totalGenerations - stats.successfulGenerations) {
+    console.warn("⚠️ Failed count mismatch, fixing...");
+    stats.failedGenerations = stats.totalGenerations - stats.successfulGenerations;
+    saveStats(stats);
   }
 
   const response = {
@@ -140,48 +185,86 @@ export function getStats(): StatsResponse {
 
 export function updateStats(success: boolean, processingTime: number) {
   console.log("🔄 updateStats called", { success, processingTime });
-  const stats = loadStats();
-  const oldTotal = stats.totalGenerations;
-  const oldSuccess = stats.successfulGenerations;
   
-  // Reset daily if needed
-  resetDailyIfNeeded(stats);
-  
-  // Increment total first
-  stats.totalGenerations++;
-  
-  // Then update success/failure
-  if (success) {
-    stats.successfulGenerations++;
-  } else {
-    stats.failedGenerations++;
+  try {
+    const stats = loadStats();
+    const oldTotal = stats.totalGenerations;
+    const oldSuccess = stats.successfulGenerations;
+    
+    console.log("📥 Loaded stats before update:", { 
+      total: stats.totalGenerations, 
+      success: stats.successfulGenerations,
+      failed: stats.failedGenerations 
+    });
+    
+    // Reset daily if needed
+    resetDailyIfNeeded(stats);
+    
+    // Increment total first
+    stats.totalGenerations++;
+    
+    // Then update success/failure
+    if (success) {
+      stats.successfulGenerations++;
+    } else {
+      stats.failedGenerations++;
+    }
+    
+    // Ensure consistency - failed should be total - successful
+    stats.failedGenerations = stats.totalGenerations - stats.successfulGenerations;
+    
+    // Ensure successfulGenerations never exceeds totalGenerations
+    if (stats.successfulGenerations > stats.totalGenerations) {
+      console.warn("⚠️ successfulGenerations > totalGenerations, fixing...");
+      stats.successfulGenerations = stats.totalGenerations;
+      stats.failedGenerations = 0;
+    }
+    
+    stats.processingTimes.push(processingTime);
+    // Keep only last 100 processing times
+    if (stats.processingTimes.length > 100) {
+      stats.processingTimes.shift();
+    }
+    
+    // Update today's count
+    stats.todayGenerations++;
+    stats.last24Hours++;
+    
+    // Update last reset date if not set
+    if (!stats.lastReset) {
+      const today = new Date().toISOString().split("T")[0];
+      stats.lastReset = today;
+    }
+    
+    console.log("📊 Stats after update (before save):", { 
+      oldTotal, 
+      newTotal: stats.totalGenerations, 
+      oldSuccess,
+      newSuccess: stats.successfulGenerations,
+      failed: stats.failedGenerations,
+      file: STATS_FILE
+    });
+    
+    saveStats(stats);
+    
+    // Verify the save worked by reading it back
+    try {
+      const { readFileSync, existsSync } = require("fs");
+      if (existsSync(STATS_FILE)) {
+        const saved = JSON.parse(readFileSync(STATS_FILE, "utf-8"));
+        console.log("✅ Verified saved stats:", { 
+          total: saved.totalGenerations, 
+          success: saved.successfulGenerations 
+        });
+      } else {
+        console.error("❌ Stats file doesn't exist after save!");
+      }
+    } catch (verifyError) {
+      console.error("❌ Failed to verify saved stats:", verifyError);
+    }
+    
+  } catch (error: any) {
+    console.error("❌ Error in updateStats:", error.message, error.stack);
+    throw error;
   }
-  
-  // Ensure consistency
-  stats.failedGenerations = stats.totalGenerations - stats.successfulGenerations;
-  
-  stats.processingTimes.push(processingTime);
-  // Keep only last 100 processing times
-  if (stats.processingTimes.length > 100) {
-    stats.processingTimes.shift();
-  }
-  
-  // Update today's count
-  stats.todayGenerations++;
-  stats.last24Hours++;
-  
-  // Update last reset date if not set
-  if (!stats.lastReset) {
-    const today = new Date().toISOString().split("T")[0];
-    stats.lastReset = today;
-  }
-  
-  console.log("📊 Stats update:", { 
-    oldTotal, 
-    newTotal: stats.totalGenerations, 
-    oldSuccess,
-    newSuccess: stats.successfulGenerations,
-    failed: stats.failedGenerations 
-  });
-  saveStats(stats);
 }
