@@ -6,7 +6,15 @@ export async function GET() {
   try {
     const stats = getStats();
     console.log("✅ Returning stats:", stats);
-    return NextResponse.json(stats);
+    
+    // Disable caching to ensure fresh data
+    return NextResponse.json(stats, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (e: any) {
     console.error("❌ Error in /api/stats:", e.message);
     return NextResponse.json({
@@ -16,7 +24,14 @@ export async function GET() {
       averageProcessingTime: 0,
       todayGenerations: 0,
       last24Hours: 0,
-    }, { status: 500 });
+    }, { 
+      status: 500,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   }
 }
 

@@ -20,8 +20,15 @@ interface StatsData {
 function loadStats(): StatsData {
   try {
     if (existsSync(STATS_FILE)) {
+      // Force read from disk (no caching)
       const data = readFileSync(STATS_FILE, "utf-8");
       const stats = JSON.parse(data);
+      
+      console.log("📥 loadStats read from file:", { 
+        total: stats.totalGenerations, 
+        success: stats.successfulGenerations,
+        file: STATS_FILE 
+      });
       
       // Only initialize to 5000+ if file exists but is empty/corrupted
       // Don't reset if stats already exist (even if < 5000)
@@ -43,6 +50,7 @@ function loadStats(): StatsData {
       
       // Ensure successfulGenerations doesn't exceed totalGenerations
       if (stats.successfulGenerations > stats.totalGenerations) {
+        console.warn("⚠️ Fixing: successfulGenerations > totalGenerations");
         stats.successfulGenerations = stats.totalGenerations;
         stats.failedGenerations = 0;
         saveStats(stats);
@@ -51,14 +59,17 @@ function loadStats(): StatsData {
       // Ensure failedGenerations is correct
       const expectedFailed = stats.totalGenerations - stats.successfulGenerations;
       if (stats.failedGenerations !== expectedFailed) {
+        console.warn("⚠️ Fixing failedGenerations count");
         stats.failedGenerations = expectedFailed;
         saveStats(stats);
       }
       
       return stats;
+    } else {
+      console.warn("⚠️ Stats file doesn't exist:", STATS_FILE);
     }
-  } catch (e) {
-    console.warn("Failed to load stats from file:", e);
+  } catch (e: any) {
+    console.error("❌ Failed to load stats from file:", e.message, e.stack);
   }
 
   // Initialize with minimum values only if file doesn't exist
