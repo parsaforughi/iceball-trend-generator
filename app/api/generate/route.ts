@@ -177,15 +177,18 @@ export async function POST(req: NextRequest) {
 
     // Update stats and generation tracking
     const processingTime = (Date.now() - startTime) / 1000; // in seconds
+    console.log("📊 Updating stats after successful generation", { processingTime, generationId });
     try {
       const { updateStats } = await import("@/lib/stats");
       updateStats(true, processingTime);
+      console.log("✅ Stats updated successfully");
       
       const { updateGeneration } = await import("@/lib/generations");
       updateGeneration(generationId, "completed", processingTime);
-    } catch (e) {
+      console.log("✅ Generation tracked successfully");
+    } catch (e: any) {
       // Stats update failed, but generation succeeded
-      console.warn("Failed to update stats:", e);
+      console.error("❌ Failed to update stats:", e.message, e.stack);
     }
 
     return new NextResponse(outputBuffer, {

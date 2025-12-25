@@ -66,8 +66,10 @@ function saveStats(stats: StatsData) {
     mkdirSync(DATA_DIR, { recursive: true });
     
     writeFileSync(STATS_FILE, JSON.stringify(stats, null, 2), "utf-8");
-  } catch (e) {
-    console.warn("Failed to save stats to file:", e);
+    console.log("✅ Stats saved:", { total: stats.totalGenerations, success: stats.successfulGenerations });
+  } catch (e: any) {
+    console.error("❌ Failed to save stats to file:", e.message);
+    console.error("Path:", STATS_FILE, "Data dir:", DATA_DIR);
   }
 }
 
@@ -102,7 +104,7 @@ export function getStats(): StatsResponse {
       stats.processingTimes.reduce((a, b) => a + b, 0) / stats.processingTimes.length;
   }
 
-  return {
+  const response = {
     totalGenerations: stats.totalGenerations,
     successfulGenerations: stats.successfulGenerations,
     failedGenerations: stats.failedGenerations,
@@ -110,10 +112,15 @@ export function getStats(): StatsResponse {
     todayGenerations: stats.todayGenerations,
     last24Hours: stats.last24Hours,
   };
+  
+  console.log("📤 getStats returning:", response);
+  return response;
 }
 
 export function updateStats(success: boolean, processingTime: number) {
+  console.log("🔄 updateStats called", { success, processingTime });
   const stats = loadStats();
+  const oldTotal = stats.totalGenerations;
   
   // Reset daily if needed
   resetDailyIfNeeded(stats);
@@ -141,5 +148,6 @@ export function updateStats(success: boolean, processingTime: number) {
     stats.lastReset = today;
   }
   
+  console.log("📊 Stats before save:", { old: oldTotal, new: stats.totalGenerations, success: stats.successfulGenerations });
   saveStats(stats);
 }
