@@ -2,7 +2,9 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 
-const STATS_FILE = join(process.cwd(), ".next", "stats.json");
+// Use a persistent directory that exists in production
+const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), "data");
+const STATS_FILE = join(DATA_DIR, "stats.json");
 
 interface StatsData {
   totalGenerations: number;
@@ -38,10 +40,9 @@ function loadStats(): StatsData {
 
 function saveStats(stats: StatsData) {
   try {
-    // Ensure .next directory exists
+    // Ensure data directory exists
     const { mkdirSync } = require("fs");
-    const { dirname } = require("path");
-    mkdirSync(dirname(STATS_FILE), { recursive: true });
+    mkdirSync(DATA_DIR, { recursive: true });
     
     writeFileSync(STATS_FILE, JSON.stringify(stats, null, 2), "utf-8");
   } catch (e) {

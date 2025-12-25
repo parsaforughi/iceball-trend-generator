@@ -2,7 +2,9 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 
-const GENERATIONS_FILE = join(process.cwd(), ".next", "generations.json");
+// Use a persistent directory that exists in production
+const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), "data");
+const GENERATIONS_FILE = join(DATA_DIR, "generations.json");
 
 export interface Generation {
   id: string;
@@ -27,10 +29,9 @@ function loadGenerations(): Generation[] {
 
 function saveGenerations(generations: Generation[]) {
   try {
-    // Ensure .next directory exists
+    // Ensure data directory exists
     const { mkdirSync } = require("fs");
-    const { dirname } = require("path");
-    mkdirSync(dirname(GENERATIONS_FILE), { recursive: true });
+    mkdirSync(DATA_DIR, { recursive: true });
     
     writeFileSync(GENERATIONS_FILE, JSON.stringify(generations, null, 2), "utf-8");
   } catch (e) {
