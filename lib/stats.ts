@@ -23,14 +23,35 @@ function loadStats(): StatsData {
       const data = readFileSync(STATS_FILE, "utf-8");
       const stats = JSON.parse(data);
       
-      // Ensure minimum values if stats are too low
-      if (stats.totalGenerations < 5000) {
-        stats.totalGenerations = 5000 + Math.floor(Math.random() * 1000); // 5000-6000
-        stats.successfulGenerations = Math.floor(stats.totalGenerations * 0.95); // ~95% success rate
-        stats.failedGenerations = stats.totalGenerations - stats.successfulGenerations;
-        stats.todayGenerations = Math.floor(Math.random() * 50) + 20; // 20-70
-        stats.last24Hours = Math.floor(Math.random() * 100) + 50; // 50-150
-        // Save updated stats
+      // Only initialize to 5000+ if file exists but is empty/corrupted
+      // Don't reset if stats already exist (even if < 5000)
+      if (!stats.totalGenerations && stats.totalGenerations !== 0) {
+        // File exists but stats are invalid, initialize
+        const initialStats = {
+          totalGenerations: 5000 + Math.floor(Math.random() * 1000), // 5000-6000
+          successfulGenerations: Math.floor((5000 + Math.floor(Math.random() * 1000)) * 0.95),
+          failedGenerations: 0,
+          averageProcessingTime: 0,
+          todayGenerations: Math.floor(Math.random() * 50) + 20, // 20-70
+          last24Hours: Math.floor(Math.random() * 100) + 50, // 50-150
+          processingTimes: [],
+        };
+        initialStats.failedGenerations = initialStats.totalGenerations - initialStats.successfulGenerations;
+        saveStats(initialStats);
+        return initialStats;
+      }
+      
+      // Ensure successfulGenerations doesn't exceed totalGenerations
+      if (stats.successfulGenerations > stats.totalGenerations) {
+        stats.successfulGenerations = stats.totalGenerations;
+        stats.failedGenerations = 0;
+        saveStats(stats);
+      }
+      
+      // Ensure failedGenerations is correct
+      const expectedFailed = stats.totalGenerations - stats.successfulGenerations;
+      if (stats.failedGenerations !== expectedFailed) {
+        stats.failedGenerations = expectedFailed;
         saveStats(stats);
       }
       
@@ -40,7 +61,7 @@ function loadStats(): StatsData {
     console.warn("Failed to load stats from file:", e);
   }
 
-  // Initialize with minimum values
+  // Initialize with minimum values only if file doesn't exist
   const initialStats = {
     totalGenerations: 5000 + Math.floor(Math.random() * 1000), // 5000-6000
     successfulGenerations: Math.floor((5000 + Math.floor(Math.random() * 1000)) * 0.95),
@@ -121,16 +142,23 @@ export function updateStats(success: boolean, processingTime: number) {
   console.log("🔄 updateStats called", { success, processingTime });
   const stats = loadStats();
   const oldTotal = stats.totalGenerations;
+  const oldSuccess = stats.successfulGenerations;
   
   // Reset daily if needed
   resetDailyIfNeeded(stats);
   
+  // Increment total first
   stats.totalGenerations++;
+  
+  // Then update success/failure
   if (success) {
     stats.successfulGenerations++;
   } else {
     stats.failedGenerations++;
   }
+  
+  // Ensure consistency
+  stats.failedGenerations = stats.totalGenerations - stats.successfulGenerations;
   
   stats.processingTimes.push(processingTime);
   // Keep only last 100 processing times
@@ -148,6 +176,12 @@ export function updateStats(success: boolean, processingTime: number) {
     stats.lastReset = today;
   }
   
-  console.log("📊 Stats before save:", { old: oldTotal, new: stats.totalGenerations, success: stats.successfulGenerations });
+  console.log("📊 Stats update:", { 
+    oldTotal, 
+    newTotal: stats.totalGenerations, 
+    oldSuccess,
+    newSuccess: stats.successfulGenerations,
+    failed: stats.failedGenerations 
+  });
   saveStats(stats);
 }
